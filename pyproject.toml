@@ -9,6 +9,7 @@ dependencies = [
     "fastmcp",
     "gitpython",
     "uvicorn",
+    "eai_http_middleware@git+https://github.com/daniel-bvm/http-middleware",
 ]
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -22,3 +23,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_git_ingest"] 
+
+[tool.hatch.metadata]
+allow-direct-references = true
