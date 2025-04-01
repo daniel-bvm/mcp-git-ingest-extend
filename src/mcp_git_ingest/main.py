@@ -19,6 +19,10 @@ mcp = FastMCP(
 
 def clone_repo(repo_url: str) -> str:
     """Clone a repository and return the path. If repository is already cloned in temp directory, reuse it."""
+    
+    if not repo_url.startswith("https://github.com/") and os.path.exists(repo_url):
+        return repo_url
+
     # Create a deterministic directory name based on repo URL
     repo_hash = hashlib.sha256(repo_url.encode()).hexdigest()[:12]
     temp_dir = os.path.join(tempfile.gettempdir(), f"github_tools_{repo_hash}")
@@ -68,10 +72,10 @@ def get_directory_tree(path: str, prefix: str = "") -> str:
 @mcp.tool()
 def git_directory_structure(repo_url: str) -> str:
     """
-    Clone a Git repository and return its directory structure in a tree format.
+    Clone or use existing local directory as a git repository and return its directory structure in a tree format.
     
     Args:
-        repo_url: The URL of the Git repository
+        repo_url: The URL of the Git repository or local directory
         
     Returns:
         A string representation of the repository's directory structure
@@ -90,10 +94,10 @@ def git_directory_structure(repo_url: str) -> str:
 @mcp.tool()
 def git_read_important_files(repo_url: str, file_paths: List[str]) -> dict[str, str]:
     """
-    Read the contents of specified files in a given git repository.
+    Read the contents of specified files in a given git repository or local directory.
     
     Args:
-        repo_url: The URL of the Git repository
+        repo_url: The URL of the Git repository or local directory
         file_paths: List of file paths to read (relative to repository root)
         
     Returns:
@@ -120,6 +124,76 @@ def git_read_important_files(repo_url: str, file_paths: List[str]) -> dict[str, 
         
         return results
             
+    except Exception as e:
+        return {"error": f"Failed to process repository: {str(e)}"}
+
+def modify_file_content(file_path: str, content: str, start_line: int = None, end_line: int = None) -> None:
+    """
+    Modify content of a file, either completely or partially based on line numbers.
+    
+    Args:
+        file_path: Path to the file to modify
+        content: New content to write
+        start_line: Starting line number (1-based) for partial modification
+        end_line: Ending line number (1-based) for partial modification
+    """
+    if start_line is None or end_line is None:
+        # Full file replacement
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return
+
+    # Read existing content
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # Adjust line numbers to 0-based index
+    start_idx = max(0, start_line - 1)
+    end_idx = min(len(lines), end_line)
+
+    # Replace specified lines with new content
+    new_lines = content.splitlines()
+    lines[start_idx:end_idx] = [line + '\n' for line in new_lines]
+
+    # Write back to file
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+
+
+@mcp.tool()
+def git_write_file(repo_url: str, file_path: str, content: str) -> dict[str, str]:
+    """
+    Write content to a file in a given git repository or local directory.
+    
+    Args:
+        repo_url: The URL of the Git repository or local directory
+        file_path: Path to the file to write (relative to repository root)
+        content: Content to write to the file
+        
+    Returns:
+        A dictionary containing the status of the operation
+    """
+    try:
+        # Clone the repository
+        repo_path = clone_repo(repo_url)
+        full_path = os.path.join(repo_path, file_path)
+        
+        # Create parent directories if they don't exist
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        
+        # Write the content to the file
+        with open(full_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+            
+        return {
+            "status": "success",
+            "message": f"Successfully wrote content to {file_path}",
+            "file_path": file_path
+        }
             
     except Exception as e:
-        return {"error": f"Failed to process repository: {str(e)}"} 
+        return {
+            "status": "error",
+            "message": f"Failed to write file: {str(e)}",
+            "file_path": file_path
+        } 
