@@ -8,10 +8,9 @@ authors = [
 dependencies = [
     "fastmcp",
     "gitpython",
-    "uvicorn",
+    "uvicorn"
 ]
 requires-python = ">=3.8"
-readme = "README.md"
 license = {text = "MIT"}
 
 [project.scripts]
@@ -22,4 +21,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mcp_git_ingest"] 
+packages = ["src/mcp_git_ingest"]
