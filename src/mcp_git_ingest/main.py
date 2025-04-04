@@ -2,14 +2,12 @@
 
 from fastmcp import FastMCP
 import os
-import subprocess
 from typing import List
 import tempfile
 import shutil
-from pathlib import Path
 import hashlib
 import git
-
+import json
 mcp = FastMCP(
     "GitHub Tools",
     dependencies=[
@@ -70,7 +68,7 @@ def get_directory_tree(path: str, prefix: str = "") -> str:
     return output
 
 @mcp.tool()
-def git_directory_structure(repo_url: str) -> str:
+def directory_structure() -> str:
     """
     Clone or use existing local directory as a git repository and return its directory structure in a tree format.
     
@@ -82,43 +80,42 @@ def git_directory_structure(repo_url: str) -> str:
     """
     try:
         # Clone the repository
-        repo_path = clone_repo(repo_url)
+        directory = os.getenv("DIRECTORY")
         
         # Generate the directory tree
-        tree = get_directory_tree(repo_path)
+        tree = get_directory_tree(directory)
         return tree
             
     except Exception as e:
         return f"Error: {str(e)}"
 
 @mcp.tool()
-def git_read_important_files(repo_url: str, file_paths: List[str]) -> dict[str, str]:
+def read_important_files(file_paths: List[str]) -> dict[str, str]:
     """
-    Read the contents of specified files in a given git repository or local directory.
+    Read the contents of specified files in the directory.
     
     Args:
-        repo_url: The URL of the Git repository or local directory
-        file_paths: List of file paths to read (relative to repository root)
+        file_paths: List of file paths to read (relative to the directory)
         
     Returns:
         A dictionary mapping file paths to their contents
     """
     try:
-        # Clone the repository
-        repo_path = clone_repo(repo_url)
+        directory = os.getenv("DIRECTORY")
         results = {}
         
         for file_path in file_paths:
-            full_path = os.path.join(repo_path, file_path)
-            
+            full_path = os.path.join(directory, file_path)
+
             # Check if file exists
             if not os.path.isfile(full_path):
                 results[file_path] = f"Error: File not found"
                 continue
-                
+
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     results[file_path] = f.read()
+
             except Exception as e:
                 results[file_path] = f"Error reading file: {str(e)}"
         
@@ -161,27 +158,28 @@ def modify_file_content(file_path: str, content: str, start_line: int = None, en
 
 
 @mcp.tool()
-def git_write_file(repo_url: str, file_path: str, content: str) -> dict[str, str]:
+def write_file(file_path: str, content: str | dict) -> dict[str, str]:
     """
-    Write content to a file in a given git repository or local directory.
+    Write content to a file in the directory.
     
     Args:
-        repo_url: The URL of the Git repository or local directory
-        file_path: Path to the file to write (relative to repository root)
+        file_path: Path to the file to write (relative to the directory)
         content: Content to write to the file
         
     Returns:
         A dictionary containing the status of the operation
     """
     try:
-        # Clone the repository
-        repo_path = clone_repo(repo_url)
-        full_path = os.path.join(repo_path, file_path)
+        directory = os.getenv("DIRECTORY")
+        full_path = os.path.join(directory, file_path)
         
         # Create parent directories if they don't exist
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         
         # Write the content to the file
+        if isinstance(content, dict):
+            content = json.dumps(content)
+            
         with open(full_path, 'w', encoding='utf-8') as f:
             f.write(content)
             
